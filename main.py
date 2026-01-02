@@ -9,7 +9,7 @@ from interfaces.marketplace_service import IMarketplaceService
 from logic.auth import AuthHandler
 from logic.universal_processor import UniversalProcessor
 from services.analyze_g2a_competition import CompetitionAnalysisService
-from services.driffle_adapter import DriffleServiceAdapter
+from services.driffle_adapter import DriffleServiceAdapter, extract_pid
 from services.sheet_service import SheetService
 from utils.config import settings
 
@@ -35,7 +35,8 @@ async def process_row_wrapper(
         processors: Dict[str, UniversalProcessor],
         adapters: Dict[str, IMarketplaceService],
         worker_semaphore: asyncio.Semaphore,
-        google_sheets_lock: asyncio.Semaphore
+        google_sheets_lock: asyncio.Semaphore,
+        client: DriffleClient
 ) -> Optional[Tuple[Any, Dict[str, Any]]]:
     """
     Worker xử lý 1 hàng.
@@ -60,6 +61,12 @@ async def process_row_wrapper(
             )
 
         # 3. Chạy Processor (Logic tính toán giá)
+        ## fulfill payload ===
+        service = DriffleServiceAdapter(client)
+        _offer_id = extract_pid(str(hydrated_payload.product_id))
+        hydrated_payload.real_offer_id = _offer_id
+        payload.real_product_id = await service.get_pid_by_offer_id(str(_offer_id))
+        ## ==============================
         result = await processor.process_single_payload(hydrated_payload)
         log_data = None
 
@@ -117,7 +124,8 @@ async def run_automation(
         sheet_service: SheetService,
         processors: Dict[str, UniversalProcessor],
         adapters: Dict[str, IMarketplaceService],
-        google_sheets_lock: asyncio.Semaphore
+        google_sheets_lock: asyncio.Semaphore,
+        client: DriffleClient
 ):
     worker_semaphore = asyncio.Semaphore(CONCURRENT_WORKERS)
     batch_size = CONCURRENT_WORKERS
@@ -152,7 +160,8 @@ async def run_automation(
                         processors=processors,
                         adapters=adapters,
                         worker_semaphore=worker_semaphore,
-                        google_sheets_lock=google_sheets_lock
+                        google_sheets_lock=google_sheets_lock,
+                        client=client
                     )
                 )
                 tasks.append(task)
@@ -225,7 +234,8 @@ async def main():
                     sheet_service=sheet_service,
                     processors=processors_map,
                     adapters=adapters_map,
-                    google_sheets_lock=google_sheets_lock
+                    google_sheets_lock=google_sheets_lock,
+                    client=driffle_client
                 )
 
                 logging.info(f"Round finished. Sleep {settings.SLEEP_TIME}s.")

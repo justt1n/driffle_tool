@@ -41,7 +41,7 @@ class AuthHandler:
 
             self._access_token = resp_data.data.token
 
-            self._token_expires_at = time.time() + 1500
+            self._token_expires_at = time.time() + 600 # Token hợp lệ trong 10 phút
 
             self.logger.info("Successfully acquired new access token.")
 

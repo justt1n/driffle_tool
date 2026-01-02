@@ -18,7 +18,7 @@ async def test_driffle_get_offers():
             product_id = 62593
             logger.info(f"--- Testing Driffle API for PID: {product_id} ---")
 
-            response = await driffle_client.get_offers_by_pid(pid=product_id)
+            response = await driffle_client.get_pid_by_offer_id(pid=product_id)
 
             logger.info(f"Status: {response.statusCode} | Message: {response.message}")
 

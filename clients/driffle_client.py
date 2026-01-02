@@ -3,7 +3,8 @@ from typing import Any, Dict
 
 from clients.base_rest_client import BaseRestAPIClient
 from logic.auth import AuthHandler
-from models.driffle_models import OffersResponse, ProductsResponse, UpdateOfferResponse, ProductCompetitionsResponse
+from models.driffle_models import OffersResponse, ProductsResponse, UpdateOfferResponse, ProductCompetitionsResponse, \
+    SingleOfferResponse
 from utils.config import settings
 
 
@@ -18,7 +19,7 @@ class DriffleClient(BaseRestAPIClient):
             self._client.headers.update(auth_headers)
         return kwargs
 
-    async def get_offers_by_pid(self, pid: int) -> OffersResponse:
+    async def get_pid_by_offer_id(self, pid: int) -> OffersResponse:
         return await self.get(
             endpoint="offers",
             response_model=OffersResponse,
@@ -37,7 +38,7 @@ class DriffleClient(BaseRestAPIClient):
         toggle_status = "enable" if active else "disable"
         logging.info("Updating offer %s: new price=%s, status=%s", offer_id, new_price, toggle_status)
         return await self.patch(
-            endpoint="offer/update",
+            endpoint="test/offer/update",
             response_model=UpdateOfferResponse,
             auth_required=True,
             offerId=offer_id,
@@ -49,6 +50,13 @@ class DriffleClient(BaseRestAPIClient):
         return await self.get(
             endpoint=f"products/{pid}/competitions",
             response_model=ProductCompetitionsResponse,
+            auth_required=True
+        )
+
+    async def get_offer_details(self, offer_id: int) -> SingleOfferResponse:
+        return await self.get(
+            endpoint=f"offers/{offer_id}",
+            response_model=SingleOfferResponse,
             auth_required=True
         )
 

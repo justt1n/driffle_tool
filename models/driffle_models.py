@@ -120,3 +120,55 @@ class ProductCompetitionsResponse(BaseModel):
     message: str
     pid: int
     competitions: CompetitionsData
+
+
+class PriceDetail(BaseModel):
+    yourPrice: float  # Giá gốc (Base Price) - 12.82
+    retailPrice: float  # Giá hiển thị (Retail Price) - 13.69
+
+
+class AutomatePriceOptions(BaseModel):
+    automatePriceStatus: str
+    lowerPriceLimit: Optional[float]
+    higherPriceLimit: Optional[float]
+    priceChangeInterval: Optional[int]
+    priceChangeFactor: Optional[float]
+
+
+class SingleOfferInfo(BaseModel):
+    offerId: int
+    slug: str
+    title: str
+    yourPrice: str  # Lưu ý: API trả về string "13.6900" ở root, nhưng float ở trong object price
+    status: int
+    productId: int
+    productImage: str
+    description: str
+    platform: str
+    totalAvailable: int  # Stock thực tế
+    commission: float
+    price: PriceDetail  # Object chứa giá chi tiết
+    automatePriceOptions: Optional[AutomatePriceOptions] = None
+
+
+class StockKey(BaseModel):
+    keyId: int
+    value: str
+    status: int
+
+
+class StockInfo(BaseModel):
+    totalCount: int
+    keys: List[StockKey] = []
+
+
+class SingleOfferData(BaseModel):
+    offer: SingleOfferInfo
+    stock: StockInfo
+    pages: int
+
+
+class SingleOfferResponse(BaseModel):
+    message: str
+    statusCode: int
+    data: SingleOfferData

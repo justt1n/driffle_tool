@@ -7,9 +7,28 @@ from models.logic_models import PayloadResult, CompareTarget
 from models.sheet_models import Payload
 from services.analyze_g2a_competition import CompetitionAnalysisService
 from utils.g2a_logger import get_g2a_log_string
+from utils.parser import get_prod_id
 from utils.utils import round_up_to_n_decimals
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_product_id(raw: str):
+    """
+            Extracts the product ID (PID) from the given product identifier URL.
+            Example: https://driffle.com/vi/user/selling/currently-selling/700583 -> 700583
+            """
+    try:
+        # Validate and extract the last part of the URL
+        parts = raw.rstrip("/").split("/")
+        if not parts or not parts[-1].isdigit():
+            logger.warning(f"Invalid product identifier format: {raw}")
+            return None
+
+        return int(parts[-1])
+    except Exception as e:
+        logger.error(f"Error extracting PID from product identifier: {raw}, {e}")
+        return None
 
 
 class UniversalProcessor:
@@ -60,9 +79,9 @@ class UniversalProcessor:
         if payload.price_rounding is not None and payload.price_rounding < 0:
             logger.warning("Payload validation failed: price_rounding cannot be negative.")
             return False
-        if payload.product_compare is None:
-            logger.warning("Payload validation failed: product_compare is required for comparison.")
-            return False
+        # if payload.product_compare is None:
+        #     logger.warning("Payload validation failed: product_compare is required for comparison.")
+        #     return False
         return True
 
     def _is_price_diff_significant(self, price1: float, price2: float, payload: Payload) -> bool:
@@ -103,13 +122,13 @@ class UniversalProcessor:
             # Adapter (lớp hiện thực Interface) phải tự xử lý việc parse nếu cần,
             # hoặc bạn phải parse trước khi truyền vào đây.
             # Ở đây tôi truyền thẳng payload.product_id vào.
-            current_offer = await self.market_service.get_my_offer_details(payload.product_compare)
+            current_offer = await self.market_service.get_my_offer_details(payload.real_offer_id)
 
             if not current_offer:
                 return PayloadResult(
                     status=0,
                     payload=payload,
-                    log_message=f"Fetch Current Details Failed for {payload.product_id}"
+                    log_message=f"Fetch Current Details Failed for {payload.real_product_id}"
                 )
 
             # Map dữ liệu chuẩn từ StandardCurrentOffer vào Payload
@@ -149,7 +168,7 @@ class UniversalProcessor:
             # =========================================================================
 
             # Gọi hàm get_competitor_prices theo đúng Interface
-            comp_result = await self.market_service.get_competitor_prices(payload.product_compare)
+            comp_result = await self.market_service.get_competitor_prices(payload.real_product_id)
 
             # Trích xuất list offers từ object CompetitionResult
             competitor_offers = comp_result.offers

@@ -114,6 +114,8 @@ class Payload(BaseGSheetModel):
     applied_adj: Optional[float] = 0.0
     current_price: Optional[float] = None
     final_price: Optional[float] = None
+    real_offer_id: Optional[str] = None
+    real_product_id: Optional[str] = None
 
     # convert min_price to float
     def get_min_price_value(self) -> Optional[float]:
