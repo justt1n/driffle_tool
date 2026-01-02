@@ -38,7 +38,7 @@ class DriffleClient(BaseRestAPIClient):
         toggle_status = "enable" if active else "disable"
         logging.info("Updating offer %s: new price=%s, status=%s", offer_id, new_price, toggle_status)
         return await self.patch(
-            endpoint="test/offer/update",
+            endpoint="offer/update",
             response_model=UpdateOfferResponse,
             auth_required=True,
             offerId=offer_id,
