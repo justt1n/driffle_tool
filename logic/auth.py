@@ -1,9 +1,11 @@
+import asyncio
 import logging
 import time
 from typing import Dict, Optional
 
 import httpx
 
+from constants import DEFAULT_HEADER
 from models.oauth_models import AuthResponse
 from utils.config import settings
 
@@ -19,12 +21,25 @@ class AuthHandler:
 
         self._access_token: Optional[str] = None
         self._token_expires_at: float = 0
-        self._client = httpx.AsyncClient()
+
+        self._lock = asyncio.Lock()
+
+        self._client = httpx.AsyncClient(
+            timeout=30.0,
+            headers=DEFAULT_HEADER
+        )
 
     async def get_auth_headers(self) -> Dict[str, str]:
-        if not self._access_token or time.time() > self._token_expires_at:
-            self.logger.info("Token is invalid or expired, getting a new one.")
+        if self._access_token and time.time() < self._token_expires_at:
+            return {"Authorization": f"Bearer {self._access_token}"}
+
+        async with self._lock:
+            if self._access_token and time.time() < self._token_expires_at:
+                return {"Authorization": f"Bearer {self._access_token}"}
+
+            self.logger.info("Token is invalid or expired (inside lock), getting a new one.")
             await self._get_new_token()
+
         return {"Authorization": f"Bearer {self._access_token}"}
 
     async def _get_new_token(self) -> None:
@@ -41,7 +56,7 @@ class AuthHandler:
 
             self._access_token = resp_data.data.token
 
-            self._token_expires_at = time.time() + 600 # Token hợp lệ trong 10 phút
+            self._token_expires_at = time.time() + 600  # Token hợp lệ trong 10 phút
 
             self.logger.info("Successfully acquired new access token.")
 

@@ -172,3 +172,21 @@ class SingleOfferResponse(BaseModel):
     message: str
     statusCode: int
     data: SingleOfferData
+
+
+class CommissionMoney(BaseModel):
+    amount: float
+    currency: str
+
+
+class CommissionData(BaseModel):
+    commission: Optional[CommissionMoney] = None
+    sellingPrice: Optional[CommissionMoney] = None
+    youGetPrice: Optional[CommissionMoney] = None
+
+
+class CommissionResponse(BaseModel):
+    status: Optional[int] = None
+    statusCode: Optional[int] = None
+    message: str
+    data: CommissionData

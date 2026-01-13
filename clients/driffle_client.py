@@ -1,10 +1,10 @@
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from clients.base_rest_client import BaseRestAPIClient
 from logic.auth import AuthHandler
 from models.driffle_models import OffersResponse, ProductsResponse, UpdateOfferResponse, ProductCompetitionsResponse, \
-    SingleOfferResponse
+    SingleOfferResponse, CommissionResponse
 from utils.config import settings
 
 
@@ -58,6 +58,15 @@ class DriffleClient(BaseRestAPIClient):
             endpoint=f"offers/{offer_id}",
             response_model=SingleOfferResponse,
             auth_required=True
+        )
+
+    async def calculate_commission(self, product_id: int, selling_price: float) -> Optional[CommissionResponse]:
+        return await self.post(
+            endpoint="product/commission",
+            response_model=CommissionResponse,
+            auth_required=True,
+            productId=product_id,
+            sellingPrice=selling_price
         )
 
     async def close(self):
