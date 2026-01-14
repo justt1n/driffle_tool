@@ -14,7 +14,12 @@ class IMarketplaceService(ABC):
         pass
 
     @abstractmethod
-    async def get_competitor_prices(self, product_id: str) -> CompetitionResult:
+    async def get_competitor_prices(
+            self,
+            product_compare: str,
+            min_price: Optional[float] = None,
+            max_price: Optional[float] = None
+    ) -> CompetitionResult:
         """Lấy danh sách giá đối thủ và chuẩn hóa về CompetitionResult"""
         pass
 

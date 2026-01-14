@@ -168,7 +168,11 @@ class UniversalProcessor:
             # =========================================================================
 
             # Gọi hàm get_competitor_prices theo đúng Interface
-            comp_result = await self.market_service.get_competitor_prices(payload.real_product_id)
+            comp_result = await self.market_service.get_competitor_prices(
+                product_compare=payload.real_product_id,
+                min_price=payload.fetched_min_price,
+                max_price=payload.fetched_max_price
+            )
 
             # Trích xuất list offers từ object CompetitionResult
             competitor_offers = comp_result.offers

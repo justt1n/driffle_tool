@@ -11,7 +11,7 @@ def _g2a_analysis_log_string(
 
     competitor_price = analysis_result.competitive_price
     if competitor_price is None or competitor_price == float('inf'):
-        competitor_name = "Max price (fallback)"
+        competitor_name = "Max price"
         competitor_price = payload.fetched_max_price
     else:
         competitor_name = analysis_result.competitor_name
@@ -34,7 +34,6 @@ def _g2a_analysis_log_string(
     if analysis_result.top_sellers_for_log:
         log_parts.append("- Top Sellers: ")
 
-        # Sắp xếp dựa trên attribute .price
         sorted_offers = sorted(analysis_result.top_sellers_for_log, key=lambda o: o.price)
 
         top_str = "; ".join([

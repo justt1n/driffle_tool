@@ -1,6 +1,6 @@
 # standard_models.py
 
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -9,6 +9,8 @@ class StandardCompetitorOffer(BaseModel):
     price: float
     seller_name: str
     rating: int = 0
+    is_eligible: bool = True
+    note: Optional[str] = None
 
 
 class StandardCurrentOffer(BaseModel):

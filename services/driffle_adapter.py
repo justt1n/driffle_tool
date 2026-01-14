@@ -62,73 +62,117 @@ class DriffleServiceAdapter(IMarketplaceService):
             logger.error(f"Error getting my offer details for {offer_id}: {e}", exc_info=True)
             return None
 
-    async def get_competitor_prices(self, product_compare: str) -> CompetitionResult:
+    async def get_competitor_prices(
+            self,
+            product_compare: str,
+            min_price: Optional[float] = None,
+            max_price: Optional[float] = None
+    ) -> CompetitionResult:
         try:
             pid = int(product_compare)
             if not pid:
                 return CompetitionResult(offers=[])
 
             response = await self.client.get_product_competitions(pid=pid)
-
             if not response or not response.competitions or not response.competitions.offers:
                 return CompetitionResult(offers=[])
 
-            valid_offers = []
+            limit_min_base = min_price if min_price is not None else 0.0
+            limit_max_base = max_price if max_price is not None else float('inf')
+
+            # Danh sách để tính toán commission (chỉ tính cho những thằng CÓ THỂ hợp lệ)
+            potential_retail_prices = set()
+
+            # Danh sách kết quả tạm
+            all_offers_raw = []
+
             for item in response.competitions.offers:
-                if item.belongsToYou: continue
-                if not item.isInStock or not item.canBePurchased: continue
-                valid_offers.append(item)
+                if item.belongsToYou or not item.isInStock or not item.canBePurchased:
+                    continue
 
-            valid_offers.sort(key=lambda x: x.price.amount)
+                retail_val = item.price.amount
 
-            if not valid_offers:
-                return CompetitionResult(offers=[])
+                # Check 1: Pre-filter (Retail < Min Base)
+                # Nếu Retail đã thấp hơn Min Base -> Chắc chắn Base thấp hơn -> Loại luôn, khỏi tính Com.
+                if retail_val < limit_min_base:
+                    # Thêm vào list nhưng đánh dấu FALSE
+                    all_offers_raw.append({
+                        "item": item,
+                        "base_price": retail_val,  # Lưu tạm retail để log
+                        "is_eligible": False,
+                        "note": f"Retail({retail_val}) < Min({limit_min_base})"
+                    })
+                    continue
 
-            unique_prices_to_calc = set()
-            for offer in valid_offers:
-                unique_prices_to_calc.add(offer.price.amount)
-                if len(unique_prices_to_calc) >= 4:
-                    break
+                # Nếu qua vòng gửi xe, thêm vào danh sách cần tính Commission
+                potential_retail_prices.add(retail_val)
+                all_offers_raw.append({
+                    "item": item,
+                    "base_price": None,  # Chờ tính
+                    "is_eligible": True,  # Tạm thời True
+                    "note": None
+                })
 
+            # Tính toán Commission cho các Unique Retail Price
+            sorted_retail_prices = sorted(list(potential_retail_prices))[:8]
             price_map: Dict[float, float] = {}
 
-            tasks = []
-            price_keys = list(unique_prices_to_calc)
+            for retail_price in sorted_retail_prices:
+                try:
+                    res = await self.client.calculate_commission(product_id=pid, selling_price=retail_price)
+                    if res and res.data and res.data.youGetPrice:
+                        price_map[retail_price] = res.data.youGetPrice.amount
+                    else:
+                        price_map[retail_price] = round(retail_price * 0.88, 2)
+                except Exception:
+                    price_map[retail_price] = round(retail_price * 0.88, 2)
+                await asyncio.sleep(0.3)
 
-            for retail_price in price_keys:
-                tasks.append(self.client.calculate_commission(product_id=pid, selling_price=retail_price))
-
-            results = await asyncio.gather(*tasks)
-
-            for idx, res in enumerate(results):
-                input_retail = price_keys[idx]
-                if res and res.data and res.data.youGetPrice:
-                    price_map[input_retail] = res.data.youGetPrice.amount
-                else:
-                    # Nếu lỗi API, fallback tạm dùng retail
-                    logger.error("Cant get seller price")
-                    price_map[input_retail] = input_retail
-
+            # Build kết quả cuối cùng
             standard_offers = []
 
-            for item in valid_offers:
-                retail_price = item.price.amount
+            for entry in all_offers_raw:
+                item = entry["item"]
 
-                if retail_price in price_map:
-                    base_price = price_map[retail_price]
-
+                # Nếu đã bị loại ở vòng 1 (Retail < Min)
+                if not entry["is_eligible"]:
                     standard_offers.append(StandardCompetitorOffer(
                         seller_name=item.merchantName,
-                        price=base_price,  # ĐÂY LÀ BASE PRICE (You Get)
-                        rating=0
+                        price=entry["base_price"],
+                        is_eligible=False,
+                        note=entry["note"]
                     ))
-                # Có thể uncomment dòng dưới nếu muốn giữ cả các đối thủ giá cao (nhưng là giá Retail)
-                # standard_offers.append(StandardCompetitorOffer(seller_name=item.merchantName, price=retail_price))
+                    continue
+
+                # Xử lý những thằng vào vòng 2
+                retail = item.price.amount
+                if retail in price_map:
+                    real_base_price = price_map[retail]
+
+                    # CHECK RANGE CHÍNH THỨC (Base vs Min/Max)
+                    if limit_min_base <= real_base_price <= limit_max_base:
+                        standard_offers.append(StandardCompetitorOffer(
+                            seller_name=item.merchantName,
+                            price=real_base_price,
+                            is_eligible=True  # Hợp lệ
+                        ))
+                    else:
+                        # Bị loại ở vòng 2
+                        note = "Base < Min" if real_base_price < limit_min_base else "Base > Max"
+                        standard_offers.append(StandardCompetitorOffer(
+                            seller_name=item.merchantName,
+                            price=real_base_price,
+                            is_eligible=False,  # Loại
+                            note=f"{note} ({real_base_price})"
+                        ))
+                else:
+                    # Trường hợp không nằm trong top ưu tiên tính toán -> Coi như loại hoặc ignore
+                    pass
 
             return CompetitionResult(offers=standard_offers)
 
         except Exception as e:
-            logger.error(f"Error getting competition for {product_compare}: {e}", exc_info=True)
+            logger.error(f"Error getting competition: {e}", exc_info=True)
             return CompetitionResult(offers=[])
 
     async def update_price(self, offer_id: str, new_price: float, offer_type: str) -> bool:

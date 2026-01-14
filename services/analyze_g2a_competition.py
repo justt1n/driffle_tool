@@ -13,13 +13,13 @@ class CompetitionAnalysisService:
     def analyze_competition(self, payload: Payload, offers: List[StandardCompetitorOffer]) -> AnalysisResult:
         blacklist = payload.fetched_black_list or []
 
-        filtered_offers = [
+        non_blacklisted_offers = [
             offer for offer in offers
             if offer.seller_name.lower() not in (seller.lower() for seller in blacklist)
         ]
 
-        if not filtered_offers:
-            logger.warning(f"No valid offers found for {payload.product_name} after filtering blacklist.")
+        if not non_blacklisted_offers:
+            logger.warning(f"No offers found for {payload.product_name} after blacklist filtering.")
             return AnalysisResult(
                 competitor_name=None,
                 competitive_price=None,
@@ -27,19 +27,31 @@ class CompetitionAnalysisService:
                 sellers_below_min=[]
             )
 
-        lowest_offer = min(filtered_offers, key=lambda offer: offer.price)
+        valid_targets = [o for o in non_blacklisted_offers if o.is_eligible]
+
+        sorted_for_log = sorted(non_blacklisted_offers, key=lambda x: (not x.is_eligible, x.price))
+
+        competitor_name = None
+        competitive_price = None
+
+        if valid_targets:
+            lowest_offer = min(valid_targets, key=lambda offer: offer.price)
+            competitor_name = lowest_offer.seller_name
+            competitive_price = lowest_offer.price
+        else:
+            pass
 
         min_price_val = payload.get_min_price_value()
         sellers_below_min = []
         if min_price_val is not None:
             sellers_below_min = [
-                offer for offer in offers
+                offer for offer in non_blacklisted_offers
                 if offer.price < min_price_val
             ]
 
         return AnalysisResult(
-            competitor_name=lowest_offer.seller_name,
-            competitive_price=lowest_offer.price,
-            top_sellers_for_log=offers,
+            competitor_name=competitor_name,
+            competitive_price=competitive_price,
+            top_sellers_for_log=sorted_for_log,
             sellers_below_min=sellers_below_min
         )
