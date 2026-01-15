@@ -100,8 +100,9 @@ class UniversalProcessor:
         # Ngưỡng = Biên độ dao động Random + Sai số làm tròn
         threshold = random_noise + (step * 0.5)
         threshold = max(threshold, step * 1.5)  # Tối thiểu chặn được sai số 1 đơn vị
-
-        return abs(price1 - price2) > threshold
+        # disable for now
+        # return abs(price1 - price2) > threshold
+        return True
 
     async def process_single_payload(self, payload: Payload) -> PayloadResult:
         """
